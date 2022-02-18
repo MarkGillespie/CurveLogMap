@@ -149,7 +149,9 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
 
     // TODO: this factors matrices again, which is unnecessary. Use vhm instead?
     HeatMethodDistanceSolver hm(geom);
-    VertexData<double> curveDist = hm.computeDistance(curve);
+    VertexData<double> curveDist = hm.computeDistanceCurve(curve);
+    // VertexData<double> oldDist   = hm.computeDistance(curve);
+    // psMesh->addVertexDistanceQuantity("oldDist", oldDist);
 
     VertexData<Vector2> logStart = vhm.computeLogMap(curve.front());
     VertexData<Vector2> logEnd   = vhm.computeLogMap(curve.back());
@@ -181,11 +183,16 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
     VertexData<std::pair<double, Vector2>> curveLog(mesh);
     VertexData<Vector2> justLog(mesh);
     VertexData<double> distToStart(mesh);
+    VertexData<double> hmDistToStart = hm.computeDistance(curve.front());
+    VertexData<double> hmDistToEnd   = hm.computeDistance(curve.back());
     VertexData<double> closestPointType(mesh);
     for (Vertex v : mesh.vertices()) {
-        double dStart = logStart[v].norm();
-        double dEnd   = logEnd[v].norm();
+        double dStart = hmDistToStart[v];
+        double dEnd   = hmDistToEnd[v];
         double dMid   = curveDist[v];
+
+        logStart[v] = logStart[v].normalize() * dStart;
+        logEnd[v]   = logEnd[v].normalize() * dEnd;
 
         distToStart[v] = dStart;
 
@@ -207,13 +214,17 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
 
     psMesh->addVertexScalarQuantity("closest point", closestPoint)
         ->setEnabled(true);
-    psMesh->addVertexScalarQuantity("onLeft", leftCoeff)->setEnabled(true);
-    psMesh->addVertexScalarQuantity("closest point type", closestPointType);
+    // psMesh->addVertexScalarQuantity("onLeft", leftCoeff)->setEnabled(true);
+    // psMesh->addVertexScalarQuantity("closest point type", closestPointType);
     psMesh->addVertexDistanceQuantity("dist to curve", curveDist)
         ->setEnabled(true);
     psMesh->addVertexDistanceQuantity("dist to start", distToStart);
-    psMesh->addVertexParameterizationQuantity("log start", logStart)
-        ->setStyle(polyscope::ParamVizStyle::LOCAL_RAD);
+    psMesh->addVertexDistanceQuantity("hm dist to start", hmDistToStart);
+    // psMesh->addVertexParameterizationQuantity("log start", logStart)
+    //     ->setStyle(polyscope::ParamVizStyle::LOCAL_RAD);
+    geom.requireEdgeLengths();
+    psMesh->addEdgeScalarQuantity("len", geom.edgeLengths);
+    geom.unrequireEdgeLengths();
     psMesh->addVertexParameterizationQuantity("logs", justLog)
         ->setStyle(polyscope::ParamVizStyle::LOCAL_RAD)
         ->setEnabled(true);
