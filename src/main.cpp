@@ -149,7 +149,8 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
 
     // TODO: this factors matrices again, which is unnecessary. Use vhm instead?
     HeatMethodDistanceSolver hm(geom);
-    VertexData<double> curveDist = hm.computeDistanceCurve(curve);
+    // VertexData<double> curveDist = hm.computeDistanceCurve(curve);
+    VertexData<double> curveDist = hm.computeDistance(curve);
     // VertexData<double> oldDist   = hm.computeDistance(curve);
     // psMesh->addVertexDistanceQuantity("oldDist", oldDist);
 
@@ -182,7 +183,6 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
 
     VertexData<std::pair<double, Vector2>> curveLog(mesh);
     VertexData<Vector2> justLog(mesh);
-    VertexData<double> distToStart(mesh);
     VertexData<double> hmDistToStart = hm.computeDistance(curve.front());
     VertexData<double> hmDistToEnd   = hm.computeDistance(curve.back());
     VertexData<double> closestPointType(mesh);
@@ -194,21 +194,40 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
         logStart[v] = logStart[v].normalize() * dStart;
         logEnd[v]   = logEnd[v].normalize() * dEnd;
 
-        distToStart[v] = dStart;
-
-        double tol = 1;
-        if (dStart < dEnd && dStart <= dMid * tol) {
-            curveLog[v]         = std::make_pair(0, logStart[v]);
-            closestPointType[v] = -1;
-        } else if (dEnd < dStart && dEnd <= dMid * tol) {
-            curveLog[v]         = std::make_pair(1, logEnd[v]);
-            closestPointType[v] = 1;
+        if (dStart < dEnd) {
+            if (abs(arg(-logStart[v])) < M_PI / 2. && dStart <= dMid) {
+                curveLog[v]         = std::make_pair(0, logStart[v]);
+                closestPointType[v] = -1;
+            } else {
+                closestPointType[v] = 0;
+                curveLog[v]         = std::make_pair(
+                    closestPoint[v] / curveLen,
+                    Vector2{0, copysign(curveDist[v], leftCoeff[v])});
+            }
         } else {
-            closestPointType[v] = 0;
-            curveLog[v]         = std::make_pair(
-                closestPoint[v] / curveLen,
-                Vector2{0, copysign(curveDist[v], leftCoeff[v])});
+            if (abs(arg(logEnd[v])) < M_PI / 2. && dEnd <= dMid) {
+                curveLog[v]         = std::make_pair(1, logEnd[v]);
+                closestPointType[v] = 1;
+            } else {
+                closestPointType[v] = 0;
+                curveLog[v]         = std::make_pair(
+                    closestPoint[v] / curveLen,
+                    Vector2{0, copysign(curveDist[v], leftCoeff[v])});
+            }
         }
+        // double tol = 1;
+        // if (dStart < dEnd && dStart <= dMid * tol) {
+        //     curveLog[v]         = std::make_pair(0, logStart[v]);
+        //     closestPointType[v] = -1;
+        // } else if (dEnd < dStart && dEnd <= dMid * tol) {
+        //     curveLog[v]         = std::make_pair(1, logEnd[v]);
+        //     closestPointType[v] = 1;
+        // } else {
+        //     closestPointType[v] = 0;
+        //     curveLog[v]         = std::make_pair(
+        //         closestPoint[v] / curveLen,
+        //         Vector2{0, copysign(curveDist[v], leftCoeff[v])});
+        // }
         justLog[v] = curveLog[v].second;
     }
 
@@ -218,7 +237,8 @@ curveLogMap(ManifoldSurfaceMesh& mesh, VertexPositionGeometry& geom,
     // psMesh->addVertexScalarQuantity("closest point type", closestPointType);
     psMesh->addVertexDistanceQuantity("dist to curve", curveDist)
         ->setEnabled(true);
-    psMesh->addVertexDistanceQuantity("dist to start", distToStart);
+    psMesh->addVertexDistanceQuantity("dist to start", hmDistToStart);
+    psMesh->addVertexDistanceQuantity("dist to end", hmDistToEnd);
     psMesh->addVertexDistanceQuantity("hm dist to start", hmDistToStart);
     // psMesh->addVertexParameterizationQuantity("log start", logStart)
     //     ->setStyle(polyscope::ParamVizStyle::LOCAL_RAD);
